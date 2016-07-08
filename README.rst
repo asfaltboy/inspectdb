@@ -54,7 +54,7 @@ Now we add this model to our app, and the app to the INSTALLED_APPS. But, as the
     OperationalError: no such column: connections.id
 
 
-Let's just add a PK and make table acceptable in Django right? Unfortunately, not so easy:
+Let's just add a PK and make table acceptable in Django right? Alas, not so easy:
 
 .. code-block:: sql
 
@@ -62,6 +62,44 @@ Let's just add a PK and make table acceptable in Django right? Unfortunately, no
 
     > ALTER TABLE connections add column id integer NOT NULL PRIMARY KEY AUTOINCREMENT;
     Error: Cannot add a PRIMARY KEY column
+
+
+Coincidentally, if we may want to create a migration that tries to adds the field. A proper migration would look somewhat like this:
+
+.. code-block:: python
+
+
+    class Migration(migrations.Migration):
+
+        dependencies = [
+            ('testapp', '0001_initial'),
+        ]
+
+        operations = [
+            migrations.AddField(
+                model_name='connections',
+                name='id',
+                field=models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID'),
+            ),
+        ]
+
+Unfortunately, in SQLite it pass-fails silently (no field created, no errors raised)
+
+So for SQLite we're out of luck. Our best bet would be to dump the table data, drop the table, create a new table with a primary key and finally reload the table data.
+Frankly, this seems also to be the safest way to do it generally.
+
+Now, what if we use a more sofisticated database such as PostgreSQL ? Sadly, the migration to add the field fails again, this time
+the primary key field **is created**; however, it is missing the auto-increment property.
+
+Luckily altering or creating the required field in PostgreSQL is easy:
+
+.. code-block:: sql
+
+    # create the field as required:
+    > ALTER TABLE connections ADD COLUMN id SERIAL PRIMARY KEY;
+
+    # Or, if you prefer to update the previously created field
+    > ALTER TABLE connections ALTER id SET default nextval('connections_id_seq');
 
 
 .. _question: http://stackoverflow.com/questions/38232364/django-model-tries-to-auto-create-a-primary-key-field-even-though-it-is-already
